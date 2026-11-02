@@ -1,0 +1,57 @@
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+
+/**
+ * Configuración del plugin de React Native (plantilla 0.74.5).
+ * Los valores por defecto (root, reactNativeDir, codegenDir, cliFile, hermesCommand,
+ * entryFile, bundleCommand...) son los correctos para este proyecto.
+ * El autolinking en 0.74 se hace con native_modules.gradle (ver final del archivo
+ * y android/settings.gradle).
+ */
+react {
+}
+
+def enableProguardInReleaseBuilds = false
+def jscFlavor = 'org.webkit:android-jsc:+'
+
+android {
+    ndkVersion rootProject.ext.ndkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
+
+    namespace "com.fileexplorer"
+    defaultConfig {
+        applicationId "com.fileexplorer"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0.0"
+    }
+    buildFeatures {
+        buildConfig true
+    }
+    buildTypes {
+        release {
+            // Firmado con la clave de depuración que AGP genera automáticamente.
+            // Para publicar, crea tu propio keystore y cambia esta línea.
+            signingConfig signingConfigs.debug
+            minifyEnabled enableProguardInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+}
+
+dependencies {
+    implementation("com.facebook.react:react-android")
+    implementation("androidx.core:core:1.12.0")
+
+    if (hermesEnabled.toBoolean()) {
+        implementation("com.facebook.react:hermes-android")
+    } else {
+        implementation jscFlavor
+    }
+}
+
+// Autolinking de RN 0.74 (CLI 13): registra las dependencias nativas y genera PackageList.
+apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)

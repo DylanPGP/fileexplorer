@@ -1,0 +1,63 @@
+name: Compilar APK
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # React Native 0.74.5 usa Gradle 8.6 (ver android/gradle/wrapper/gradle-wrapper.properties).
+      # El proyecto no incluye gradle-wrapper.jar, por eso se instala esa misma versión aquí.
+      - name: Gradle 8.6
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.6
+
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+
+      - name: Verificar versiones y autolinking de React Native 0.74
+        run: |
+          set -e
+          echo "react-native:        $(node -p "require('./node_modules/react-native/package.json').version")"
+          echo "gradle-plugin RN:    $(node -p "require('./node_modules/@react-native/gradle-plugin/package.json').version")"
+          echo "cli-platform-android: $(node -p "require('./node_modules/@react-native-community/cli-platform-android/package.json').version")"
+          test -d node_modules/@react-native/gradle-plugin || { echo "Falta @react-native/gradle-plugin"; exit 1; }
+          test -f node_modules/@react-native-community/cli-platform-android/native_modules.gradle || { echo "Falta native_modules.gradle (autolinking de RN 0.74)"; exit 1; }
+          node -e "const v=require('./node_modules/react-native/package.json').version; if(v!=='0.74.5'){console.error('Se esperaba react-native 0.74.5 y hay '+v);process.exit(1)}"
+
+      - name: Aceptar licencias del SDK de Android
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: Compilar APK release
+        working-directory: android
+        run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: Subir APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: archivos-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
